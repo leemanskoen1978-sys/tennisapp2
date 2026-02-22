@@ -110,6 +110,7 @@ def send_lessen_email() -> bool:
     Gebruikt Gmail API als Google OAuth credentials beschikbaar zijn (aanbevolen in CI).
     Valt anders terug op SMTP (kan geblokkeerd zijn vanuit GitHub Actions).
     """
+    logger.info("email_sender: Gmail API eerst, dan SMTP-fallback")
     path = Path(EXCEL_OUTPUT)
     if not path.exists():
         logger.error("Excel-bestand niet gevonden: %s", path)
@@ -121,9 +122,15 @@ def send_lessen_email() -> bool:
     if _send_via_gmail_api(msg):
         return True
 
-    # 2. Fallback: SMTP (vereist app-wachtwoord)
+    # 2. Fallback: SMTP (niet in CI - daar werkt SMTP niet door blacklist/app-wachtwoord)
+    if IS_CI:
+        logger.error(
+            "Gmail API mislukt in CI. Controleer GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "
+            "GOOGLE_REFRESH_TOKEN in GitHub Secrets. SMTP-fallback niet gebruikt (faalt in CI)."
+        )
+        return False
     password = load_email_credentials()
-    if not password and not IS_CI:
+    if not password:
         try:
             password = getpass.getpass("Voer Gmail app-wachtwoord in (leemanskoen1978@gmail.com): ")
             if password:
@@ -132,13 +139,7 @@ def send_lessen_email() -> bool:
         except EOFError:
             password = None
     if not password:
-        if IS_CI:
-            logger.warning(
-                "Gmail API mislukt en geen EMAIL_PASSWORD. Zet GOOGLE_* secrets correct "
-                "en voer setup_google_calendar.py opnieuw uit (met Gmail API scope)."
-            )
-        else:
-            logger.warning("Geen e-mail credentials. Gebruik Google OAuth of Gmail app-wachtwoord.")
+        logger.warning("Geen e-mail credentials. Gebruik Google OAuth of Gmail app-wachtwoord.")
         return False
 
     return _send_via_smtp(msg, password)
