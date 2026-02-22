@@ -48,13 +48,16 @@ jobs:
         if: success()
         run: |
           EXCEL=$(find . -name "tennis_lessen.xlsx" 2>/dev/null | head -1)
-          if [ -n "$EXCEL" ]; then
-            cp "$EXCEL" "$GITHUB_WORKSPACE/tennis_lessen.xlsx"
-            echo "Excel gekopieerd naar workspace"
-          else
+          if [ -z "$EXCEL" ]; then
             echo "Waarschuwing: tennis_lessen.xlsx niet gevonden"
             ls -laR .
+            exit 1
           fi
+          TARGET="$GITHUB_WORKSPACE/tennis_lessen.xlsx"
+          if [ "$(realpath "$EXCEL")" != "$(realpath "$TARGET")" ]; then
+            cp "$EXCEL" "$TARGET"
+          fi
+          echo "Excel beschikbaar voor artifact"
 
       - name: Upload Excel als download
         if: success()
