@@ -38,9 +38,21 @@ jobs:
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: python run_tennis_scraper.py --scrape
 
-      - name: Upload Excel als download (fallback als e-mail faalt)
-        uses: actions/upload-artifact@v4
+      - name: Zet Excel in workspace voor artifact
         if: success()
+        run: |
+          EXCEL=$(find . -name "tennis_lessen.xlsx" 2>/dev/null | head -1)
+          if [ -n "$EXCEL" ]; then
+            cp "$EXCEL" "$GITHUB_WORKSPACE/tennis_lessen.xlsx"
+            echo "Excel gekopieerd naar workspace"
+          else
+            echo "Waarschuwing: tennis_lessen.xlsx niet gevonden"
+            ls -laR .
+          fi
+
+      - name: Upload Excel als download
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: tennis-lessen-excel
           path: tennis_lessen.xlsx
