@@ -1,0 +1,48 @@
+# Eenmalig: haal Google OAuth-credentials binnen GitHub Actions zelf op
+# Start deze workflow handmatig, kopieer de getoonde GOOGLE_REFRESH_TOKEN
+# en plak die in Settings → Secrets → GOOGLE_REFRESH_TOKEN
+name: Fetch Google Refresh Token
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reden voor herhalen (bijv. token geweigerd vanuit GitHub)' 
+        required: false
+        default: 'Token vernieuwen voor CI'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Python opzetten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencies installeren
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-auth-oauthlib
+
+      - name: Start OAuth-flow en toon credentials
+        run: |
+          echo "=== Google OAuth via GitHub Actions ==="
+          echo "1. Klik op de link die verschijnt"
+          echo "2. Autoriseer de 'Calender scraper'"
+          echo "3. Kopiëer hieronder CLIENT_ID, CLIENT_SECRET en REFRESH_TOKEN"
+          echo "4. Plak ze in Settings → Secrets (pas GOOGLE_REFRESH_TOKEN aan)"
+          echo ""
+          python setup_google_calendar.py
+        shell: bash
+
+      - name: Token-gebruik uitleg
+        run: |
+          echo "=== Wat nu? ==="
+          echo "Kopieer de JUST verschenen GOOGLE_REFRESH_TOKEN uit bovenstaande logs"
+          echo "Ga naar: https://github.com/leemanskoen1978-sys/tennisapp2/settings/secrets/actions"
+          echo "Open GOOGLE_REFRESH_TOKEN en plak de nieuwe waarde"
+          echo "Daarna kun je deze workflow verwijderen (is éénmalig)."
