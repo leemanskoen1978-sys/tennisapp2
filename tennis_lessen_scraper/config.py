@@ -9,10 +9,10 @@ BASE_DIR = Path(__file__).parent
 CREDENTIALS_FILE = BASE_DIR / "credentials.enc"
 SESSION_STATE_FILE = BASE_DIR / "browser_session.json"
 
-# Cloud/CI mode (GitHub Actions): gebruik temp bestand
+# Cloud/CI mode (GitHub Actions): gebruik werkmap zodat we als artifact kunnen uploaden
 IS_CI = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
 EXCEL_OUTPUT = (
-    Path(tempfile.gettempdir()) / "tennis_lessen.xlsx"
+    Path.cwd() / "tennis_lessen.xlsx"
     if IS_CI
     else Path("/Users/leko/Documents/Python/origineel factuur.xlsm")
 )

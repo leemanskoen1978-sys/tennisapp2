@@ -37,3 +37,10 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: python run_tennis_scraper.py --scrape
+
+      - name: Upload Excel als download (fallback als e-mail faalt)
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: tennis-lessen-excel
+          path: tennis_lessen.xlsx
