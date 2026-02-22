@@ -26,6 +26,12 @@ jobs:
       - name: Install Playwright browsers
         run: playwright install chromium
 
+      - name: Debug - welke e-mail code draait?
+        run: |
+          echo "=== Versie-check email_sender ==="
+          grep -n "Gmail API\|Probeer e-mail\|email_sender:" tennis_lessen_scraper/email_sender.py || true
+          head -70 tennis_lessen_scraper/email_sender.py | tail -20
+
       - name: Run scraper
         env:
           CI: true
