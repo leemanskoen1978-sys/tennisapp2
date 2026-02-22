@@ -7,7 +7,10 @@ Opent je browser voor inloggen; daarna krijg je de waarden om in te stellen.
 import os
 import sys
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/gmail.send",  # Voor e-mail verzenden via API (geen SMTP)
+]
 
 def main():
     try:
@@ -23,6 +26,7 @@ def main():
     print("Stap 1: Ga naar https://console.cloud.google.com/")
     print("  - Maak een project (of kies bestaand)")
     print("  - Zoek 'Google Calendar API' en schakel in")
+    print("  - Zoek 'Gmail API' en schakel ook in (voor e-mail versturen)")
     print("  - Ga naar APIs & Services → Credentials")
     print("  - Create Credentials → OAuth client ID")
     print("  - App type: Desktop app")

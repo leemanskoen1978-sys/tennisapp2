@@ -21,16 +21,18 @@ git push -u origin main
 ## Stap 2: Secrets instellen
 
 1. Ga naar **Settings** → **Secrets and variables** → **Actions**
-2. Voeg toe (alle vereist voor volledige werking):
+2. Voeg toe:
 
 | Secret naam            | Waarde |
 |------------------------|--------|
 | `TENNIS_USERNAME`      | Lidnummer of e-mail van Tennis Vlaanderen |
 | `TENNIS_PASSWORD`      | Wachtwoord van Tennis Vlaanderen |
-| `EMAIL_PASSWORD`       | App-wachtwoord van leemanskoen1978@gmail.com |
-| `GOOGLE_CLIENT_ID`     | Uit `setup_google_calendar.py` (bijv. xxx.apps.googleusercontent.com) |
+| `GOOGLE_CLIENT_ID`     | Uit `setup_google_calendar.py` |
 | `GOOGLE_CLIENT_SECRET` | Uit `setup_google_calendar.py` |
-| `GOOGLE_REFRESH_TOKEN` | Uit `setup_google_calendar.py` |
+| `GOOGLE_REFRESH_TOKEN` | Uit `setup_google_calendar.py` (zie onder) |
+| `EMAIL_PASSWORD`       | Optioneel: Gmail app-wachtwoord (fallback als Gmail API faalt) |
+
+**Belangrijk voor e-mail:** De scraper gebruikt nu de **Gmail API** (HTTPS) i.p.v. SMTP, zodat GitHub-runners niet worden geblokkeerd. Voer `setup_google_calendar.py` opnieuw uit nadat je de **Gmail API** in je Google Cloud-project hebt ingeschakeld. Je krijgt dan een nieuwe refresh token met o.a. `gmail.send` scope – werk `GOOGLE_REFRESH_TOKEN` bij in de secrets.
 
 ## Werking
 
