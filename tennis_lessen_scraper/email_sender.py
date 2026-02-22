@@ -55,13 +55,19 @@ def _send_via_gmail_api(msg: MIMEMultipart) -> bool:
     from google.auth.transport.requests import Request
     from googleapiclient.discovery import build
 
-    client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN", "").strip()
 
     if not (client_id and client_secret and refresh_token):
+        logger.warning(
+            "Gmail API overgeslagen: GOOGLE_CLIENT_ID/CLIENT_SECRET/REFRESH_TOKEN ontbreken "
+            "(lengtes: %s/%s/%s)",
+            len(client_id), len(client_secret), len(refresh_token),
+        )
         return False
 
+    logger.info("Probeer e-mail via Gmail API...")
     try:
         creds = Credentials.from_authorized_user_info(
             {
@@ -81,7 +87,7 @@ def _send_via_gmail_api(msg: MIMEMultipart) -> bool:
         logger.info("E-mail verstuurd via Gmail API naar %s", EMAIL_TO)
         return True
     except Exception as e:
-        logger.warning("Gmail API verzenden mislukt: %s", e)
+        logger.error("Gmail API verzenden mislukt: %s", e)
         return False
 
 
