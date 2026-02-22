@@ -16,7 +16,7 @@ from .credentials import load_email_credentials, save_email_credentials
 logger = logging.getLogger(__name__)
 
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465  # SSL (587 wordt soms geblokkeerd vanuit datacenters)
 SMTP_USER = "leemanskoen1978@gmail.com"
 
 
@@ -64,11 +64,15 @@ def send_lessen_email() -> bool:
         )
         msg.attach(part)
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, password)
-            server.sendmail(SMTP_USER, EMAIL_TO, msg.as_string())
-
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
+                server.login(SMTP_USER, password)
+                server.sendmail(SMTP_USER, EMAIL_TO, msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+                server.starttls()
+                server.login(SMTP_USER, password)
+                server.sendmail(SMTP_USER, EMAIL_TO, msg.as_string())
         logger.info("E-mail verstuurd naar %s", EMAIL_TO)
         return True
     except Exception as e:
