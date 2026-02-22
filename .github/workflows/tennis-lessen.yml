@@ -1,0 +1,39 @@
+# Tennis Vlaanderen lessen scraper - draait maandelijks in de cloud
+name: Tennis Lessen Scraper
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Python setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r tennis_lessen_scraper/requirements.txt
+
+      - name: Install Playwright browsers
+        run: playwright install chromium
+
+      - name: Run scraper
+        env:
+          CI: true
+          GITHUB_ACTIONS: true
+          TENNIS_USERNAME: ${{ secrets.TENNIS_USERNAME }}
+          TENNIS_PASSWORD: ${{ secrets.TENNIS_PASSWORD }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: python run_tennis_scraper.py --scrape

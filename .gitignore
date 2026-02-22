@@ -1,0 +1,11 @@
+venv_tennis/
+*.enc
+client_secret.json
+.env
+credentials.enc
+email_credentials.enc
+browser_session.json
+tennis_scraper.log
+__pycache__/
+*.pyc
+.DS_Store
