@@ -112,28 +112,25 @@ def get_events_with_racso(calendar_name, start_date, end_date):
     """Get events that contain 'racso' in the name within date range.
     Chunks the range by month to avoid AppleEvent timeout; filters racso in Python.
     """
-    # Chunks van één maand om timeout te voorkomen
+    # Chunks van 2 weken om timeout te voorkomen (1 maand was soms te zwaar)
+    CHUNK_DAYS = 14
+    TIMEOUT_PER_CHUNK = 180
     chunks = []
     current = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
     while current <= end:
-        # Einde van deze maand
-        if current.month == 12:
-            next_month = current.replace(year=current.year + 1, month=1, day=1)
-        else:
-            next_month = current.replace(month=current.month + 1, day=1)
-        chunk_end = next_month - timedelta(seconds=1)
+        chunk_end = current + timedelta(days=CHUNK_DAYS, seconds=-1)
         if chunk_end > end:
             chunk_end = end
         chunk_start = current
         chunks.append((chunk_start, chunk_end))
-        current = next_month
+        current = chunk_end + timedelta(seconds=1)
 
     all_events = []
     for i, (chunk_start, chunk_end) in enumerate(chunks):
         try:
             chunk_events = _get_events_in_range_chunk(
-                calendar_name, chunk_start, chunk_end, timeout_seconds=90
+                calendar_name, chunk_start, chunk_end, timeout_seconds=TIMEOUT_PER_CHUNK
             )
             # Alleen events met 'racso' in de titel
             for e in chunk_events:
