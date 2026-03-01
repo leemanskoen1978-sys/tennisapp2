@@ -37,15 +37,22 @@ def _get_events_via_eventkit(calendar_name, start_date, end_date):
     done = threading.Event()
     granted = [None]
 
-    def completion(given, err):
-        granted[0] = given
+    def completion(*args):
+        granted[0] = args[0] if args else False
         done.set()
 
     store.requestFullAccessToEventsWithCompletion_(completion)
     if not done.wait(timeout=30):
-        raise RuntimeError("Geen antwoord op Calendar-toegang.")
+        raise RuntimeError(
+            "Geen antwoord op Calendar-toegang. Zet Terminal in "
+            "Systeeminstellingen > Privacy en beveiliging > Kalenders aan."
+        )
     if not granted[0]:
-        raise RuntimeError("Geen toegang tot Calendar. Ga naar Systeemvoorkeuren > Privacy > Kalenders.")
+        raise RuntimeError(
+            "Geen toegang tot Kalenders. Ga naar Systeeminstellingen > "
+            "Privacy en beveiliging > Kalenders en zet 'Terminal' aan. "
+            "Run het script daarna opnieuw."
+        )
 
     # Zoek kalender op naam
     calendars = store.calendarsForEntityType_(0)  # 0 = EKEntityTypeEvent
