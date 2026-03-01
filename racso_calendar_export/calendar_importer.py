@@ -5,9 +5,9 @@ macOS Calendar racso-export: volledig automatisch.
 - Periode: vorige kalendermaand (1e t/m laatste dag)
 - Export: altijd .xls in de map van dit script
 Gebruik met launchd voor 1e van elke maand om 07:00.
+Gebruikt EventKit (geen AppleScript) om AppleEvent-timeouts te vermijden.
 """
 
-import subprocess
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -20,6 +20,75 @@ OUTPUT_DIR = Path(__file__).resolve().parent  # .xls in dezelfde map als dit scr
 # Titels die niet geëxporteerd mogen worden
 EXCLUDE_TITLE = "Tennis afspraken (Koen Leemans)"
 MAX_BLOCK_HOURS = 2
+
+
+def _get_events_via_eventkit(calendar_name, start_date, end_date):
+    """Haal events op via EventKit (directe Calendar API, geen AppleScript/timeout)."""
+    from EventKit import EKEventStore
+    from Foundation import NSDate
+
+    def _dt_to_ns(dt):
+        return NSDate.dateWithTimeIntervalSince1970_(dt.timestamp())
+
+    store = EKEventStore()
+
+    # Permission (async) – nodig voor toegang tot events
+    import threading
+    done = threading.Event()
+    granted = [None]
+
+    def completion(given, err):
+        granted[0] = given
+        done.set()
+
+    store.requestFullAccessToEventsWithCompletion_(completion)
+    if not done.wait(timeout=30):
+        raise RuntimeError("Geen antwoord op Calendar-toegang.")
+    if not granted[0]:
+        raise RuntimeError("Geen toegang tot Calendar. Ga naar Systeemvoorkeuren > Privacy > Kalenders.")
+
+    # Zoek kalender op naam
+    calendars = store.calendarsForEntityType_(0)  # 0 = EKEntityTypeEvent
+    cal = None
+    for c in (calendars or []):
+        if (c.title() or "").strip() == calendar_name:
+            cal = c
+            break
+    if not cal:
+        raise RuntimeError(f"Kalender '{calendar_name}' niet gevonden.")
+
+    # Events in bereik ophalen
+    start_ns = _dt_to_ns(start_date)
+    end_ns = _dt_to_ns(end_date)
+    predicate = store.predicateForEventsWithStartDate_endDate_calendars_(
+        start_ns, end_ns, [cal]
+    )
+    ek_events = store.eventsMatchingPredicate_(predicate)
+    if not ek_events:
+        return []
+
+    events = []
+    for ev in ek_events:
+        title = (ev.title() or "").strip()
+        if "racso" not in title.lower():
+            continue
+        start_ns = ev.startDate()
+        end_ns = ev.endDate()
+        start_ts = start_ns.timeIntervalSince1970() if start_ns else 0
+        end_ts = end_ns.timeIntervalSince1970() if end_ns else 0
+        start_str = datetime.fromtimestamp(start_ts).strftime("%Y-%m-%d %H:%M")
+        end_str = datetime.fromtimestamp(end_ts).strftime("%Y-%m-%d %H:%M")
+        loc = (ev.location() or "").strip()
+        notes = (ev.notes() or "").strip()
+        events.append({
+            "summary": title,
+            "start": start_str,
+            "end": end_str,
+            "location": loc,
+            "description": notes,
+        })
+    return events
+
 
 def get_date_range():
     """Altijd vorige kalendermaand: eerste dag 00:00 t/m laatste dag 23:59."""
@@ -39,110 +108,11 @@ def get_date_range():
     return start_date, end_date
 
 
-def _get_events_in_range_chunk(calendar_name, chunk_start, chunk_end, timeout_seconds=90):
-    """Haal alle events op voor een kort datumbereik (één chunk). Geen racso-filter in script."""
-    start_str = chunk_start.strftime('%m/%d/%Y %H:%M')
-    end_str = chunk_end.strftime('%m/%d/%Y %H:%M')
-    cal_escaped = calendar_name.replace('\\', '\\\\').replace('"', '\\"')
-    script = f'''
-    tell application "Calendar"
-        set targetCalendar to calendar "{cal_escaped}"
-        set outEvents to {{}}
-        set startDate to date "{start_str}"
-        set endDate to date "{end_str}"
-        set rangeEvents to (every event of targetCalendar where (its start date ≥ startDate and its end date ≤ endDate))
-        repeat with anEvent in rangeEvents
-            set eventSummary to summary of anEvent
-            set eventStart to start date of anEvent
-            set eventEnd to end date of anEvent
-            set eventLocation to ""
-            set eventDescription to ""
-            try
-                set eventLocation to location of anEvent
-            end try
-            try
-                set eventDescription to description of anEvent
-            end try
-            set startISO to my dateToISO(eventStart)
-            set endISO to my dateToISO(eventEnd)
-            set eventInfo to eventSummary & "|||" & startISO & "|||" & endISO & "|||" & eventLocation & "|||" & eventDescription
-            set end of outEvents to eventInfo
-        end repeat
-        return outEvents
-    end tell
-    on dateToISO(theDate)
-        set y to year of theDate as string
-        set m to month of theDate as integer
-        set d to day of theDate as integer
-        set h to hours of theDate as integer
-        set min to minutes of theDate as integer
-        if m < 10 then set m to "0" & m
-        if d < 10 then set d to "0" & d
-        if h < 10 then set h to "0" & h
-        if min < 10 then set min to "0" & min
-        return y & "-" & m & "-" & d & " " & h & ":" & min
-    end dateToISO
-    '''
-    result = subprocess.run(
-        ['osascript', '-e', script],
-        capture_output=True,
-        text=True,
-        timeout=timeout_seconds,
-        check=True,
-    )
-    events = []
-    output = (result.stdout or '').strip()
-    if output:
-        for event_str in output.split(', '):
-            if '|||' not in event_str:
-                continue
-            parts = event_str.split('|||')
-            if len(parts) >= 3:
-                events.append({
-                    'summary': parts[0].strip(),
-                    'start': parts[1].strip(),
-                    'end': parts[2].strip(),
-                    'location': parts[3].strip() if len(parts) > 3 else '',
-                    'description': parts[4].strip() if len(parts) > 4 else '',
-                })
-    return events
-
-
 def get_events_with_racso(calendar_name, start_date, end_date):
-    """Get events that contain 'racso' in the name within date range.
-    Chunks the range by month to avoid AppleEvent timeout; filters racso in Python.
-    """
-    # Chunks van 2 weken om timeout te voorkomen (1 maand was soms te zwaar)
-    CHUNK_DAYS = 14
-    TIMEOUT_PER_CHUNK = 180
-    chunks = []
-    current = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    end = end_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-    while current <= end:
-        chunk_end = current + timedelta(days=CHUNK_DAYS, seconds=-1)
-        if chunk_end > end:
-            chunk_end = end
-        chunk_start = current
-        chunks.append((chunk_start, chunk_end))
-        current = chunk_end + timedelta(seconds=1)
-
-    all_events = []
-    for i, (chunk_start, chunk_end) in enumerate(chunks):
-        try:
-            chunk_events = _get_events_in_range_chunk(
-                calendar_name, chunk_start, chunk_end, timeout_seconds=TIMEOUT_PER_CHUNK
-            )
-            # Alleen events met 'racso' in de titel
-            for e in chunk_events:
-                if 'racso' in (e.get('summary') or '').lower():
-                    all_events.append(e)
-        except subprocess.TimeoutExpired:
-            print(f"  Waarschuwing: timeout voor chunk {chunk_start.date()} - {chunk_end.date()}, overgeslagen.")
-        except subprocess.CalledProcessError as e:
-            print(f"  Fout bij chunk {chunk_start.date()} - {chunk_end.date()}: {e.stderr or e}")
-
-    all_events.sort(key=lambda x: x['start'])
-    return all_events
+    """Haal events met 'racso' op via EventKit (geen AppleScript)."""
+    events = _get_events_via_eventkit(calendar_name, start_date, end_date)
+    events.sort(key=lambda x: x["start"])
+    return events
 
 
 def _parse_event_datetime(s):
@@ -241,6 +211,7 @@ def save_events_to_excel(events, calendar_name, start_date, end_date):
     wb.save(str(filepath))
     return str(filepath)
 
+
 def main():
     # Volledig automatisch: Family, vorige maand, altijd .xls
     start_date, end_date = get_date_range()
@@ -258,6 +229,7 @@ def main():
     except Exception as e:
         print(f"Export mislukt: {e}", file=sys.stderr)
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
