@@ -38,7 +38,8 @@ def get_date_range():
     end_date = datetime.combine(last, datetime.max.time()).replace(microsecond=999999)
     return start_date, end_date
 
-(calendar_name, chunk_start, chunk_end, timeout_seconds=90):
+
+def _get_events_in_range_chunk(calendar_name, chunk_start, chunk_end, timeout_seconds=90):
     """Haal alle events op voor een kort datumbereik (één chunk). Geen racso-filter in script."""
     start_str = chunk_start.strftime('%m/%d/%Y %H:%M')
     end_str = chunk_end.strftime('%m/%d/%Y %H:%M')
